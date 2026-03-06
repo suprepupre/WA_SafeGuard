@@ -1,0 +1,6 @@
+## Interface: 30300
+## Title: WA SafeGuard
+## Notes: Protects WeakAuras from corruption on forced DC
+## OptionalDeps: WeakAuras
+## SavedVariables: WA_SafeGuardDB
+WA_SafeGuard.lua

@@ -1,6 +1,7 @@
 ## Interface: 30300
 ## Title: WA SafeGuard
-## Notes: Protects WeakAuras from corruption on forced DC
-## OptionalDeps: WeakAuras
+## Notes: Protects WeakAuras from corruption on forced disconnects
+## Author: Suprematist
+## Version: 1.0.1
 ## SavedVariables: WA_SafeGuardDB
 WA_SafeGuard.lua

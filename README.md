@@ -1,160 +1,123 @@
-# 🛡️ WA_SafeGuard
+# WA_SafeGuard
 
-**Automatic backup & recovery for WeakAuras on WoW 3.3.5a (WotLK)**
+Automatic backup and recovery for WeakAuras on WoW 3.3.5a (WotLK).
 
-Protects your WeakAuras from being permanently wiped when a forced disconnect corrupts `WeakAuras.lua` in SavedVariables.
+Protects your WeakAuras configuration from being permanently wiped when a forced disconnect corrupts `WeakAuras.lua` in SavedVariables.
 
-> Built for [Warmane](https://www.warmane.com/) and other 3.3.5a private servers.
-
----
-
-## 📋 Table of Contents
-
-- [The Problem](#-the-problem)
-- [Why .bak Doesn't Help](#-why-bak-doesnt-help)
-- [The Solution](#-the-solution)
-- [Installation](#-installation)
-- [Commands](#-commands)
-- [How It Works](#-how-it-works-technical)
-- [Example Output](#-example-output)
-- [FAQ](#-faq)
-- [File Structure](#-file-structure)
-- [Compatibility](#-compatibility)
-- [Contributing](#-contributing)
-- [Acknowledgments](#-acknowledgments)
+Built for Warmane and other 3.3.5a private servers.
 
 ---
 
-## 🔴 The Problem
+## Table of Contents
 
-If you run two WoW clients and log into the same account from the second client, the first client is forcefully disconnected. During shutdown, WoW tries to write all addon data (`SavedVariables`) to disk:
+- [The Problem](#the-problem)
+- [Why .bak Does Not Help](#why-bak-does-not-help)
+- [The Solution](#the-solution)
+- [Installation](#installation)
+- [Commands](#commands)
+- [How It Works](#how-it-works-technical)
+- [Example Output](#example-output)
+- [FAQ](#faq)
+- [File Structure](#file-structure)
+- [Compatibility](#compatibility)
+- [Contributing](#contributing)
+- [Acknowledgments](#acknowledgments)
+
+---
+
+## The Problem
+
+If you run two WoW clients and log into the same account from the second client, the first client is forcefully disconnected. During shutdown, WoW attempts to write all addon data (`SavedVariables`) to disk:
 
 ```
 Normal logout:
   1. WoW serializes addon data
-  2. Renames old WeakAuras.lua → WeakAuras.lua.bak
+  2. Renames old WeakAuras.lua -> WeakAuras.lua.bak
   3. Creates new WeakAuras.lua
   4. Writes all data to file
-  5. File closed, done ✅
+  5. File closed, done
 
 Forced disconnect:
   1. WoW serializes addon data
-  2. Renames old WeakAuras.lua → WeakAuras.lua.bak
+  2. Renames old WeakAuras.lua -> WeakAuras.lua.bak
   3. Creates new WeakAuras.lua
-  4. Starts writing data... CLIENT KILLED ❌
+  4. Starts writing data... CLIENT KILLED
   5. WeakAuras.lua = 1 KB of garbage (truncated)
      WeakAuras.lua.bak = previous session's file
 ```
 
-**`WeakAuras.lua` is often 5–30 MB** — one of the largest `SavedVariables` files of any addon. The operating system simply cannot flush that much data to disk before the WoW process is terminated.
+`WeakAuras.lua` often exceeds 5-30 MB, making it one of the largest SavedVariables files. The OS cannot flush that much data before the WoW process is terminated.
 
-**Result:** You log in and all your auras are gone. Completely. Irrecoverably.
-
----
-
-## ❌ Why `.bak` Doesn't Help
-
-The common advice is:
-
-> *"Just delete the broken `WeakAuras.lua` and rename `WeakAuras.lua.bak` to `WeakAuras.lua`"*
-
-**This doesn't work.** Here's why:
-
-1. WoW creates `.bak` by renaming the **current** `WeakAuras.lua` before writing the new one
-2. If the **current** file was already corrupted from a previous force DC, the `.bak` is now a copy of **corrupted data**
-3. After two consecutive forced disconnects, **both files are destroyed**
-
-```
-Session 1: Normal logout
-  WeakAuras.lua     = 15 MB ✅ (good data)
-  WeakAuras.lua.bak = 15 MB ✅ (previous good data)
-
-Session 2: Force DC
-  WeakAuras.lua     = 1 KB  ❌ (write interrupted)
-  WeakAuras.lua.bak = 15 MB ✅ (Session 1 data — still good!)
-
-Session 3: Force DC again
-  WeakAuras.lua     = 1 KB  ❌ (write interrupted again)
-  WeakAuras.lua.bak = 1 KB  ❌ (copied from Session 2's broken file)
-
-Both files are now permanently destroyed. ☠️
-```
-
-This is a **cascading failure**. Once it starts, the `.bak` mechanism cannot recover.
+**Result:** All auras are permanently lost.
 
 ---
 
-## ✅ The Solution
+## Why `.bak` Does Not Help
+
+The common workaround is to delete the broken file and rename the `.bak` file. This fails in practice:
+
+1. WoW creates `.bak` by renaming the **current** `WeakAuras.lua` before writing the new one.
+2. If the current file was already corrupted from a previous force DC, the `.bak` becomes a copy of corrupted data.
+3. After two consecutive forced disconnects, both files are destroyed.
+
+This is a cascading failure. Once the `.bak` mechanism is compromised, it cannot recover.
+
+---
+
+## The Solution
 
 **WA_SafeGuard** is a lightweight companion addon that:
 
-1. **Stores a compressed backup** of all your WeakAuras data inside its own small `SavedVariables` file
-2. **Automatically detects corruption** on every login
-3. **Automatically restores** your auras from the backup — no manual action needed
+1. Stores a compressed backup of your WeakAuras data inside its own SavedVariables file.
+2. Automatically detects corruption on login and restores your SavedVariables from backup.
+3. Requires a single `/reload` after auto-restore to apply the data in-game.
 
 ### Why this works
 
-WoW writes `SavedVariables` files in **alphabetical order by filename**:
+WoW writes `SavedVariables` files in alphabetical order:
 
 ```
-WA_SafeGuard.lua    ("WA_S...")  →  written FIRST
-WeakAuras.lua       ("Weak...")  →  written SECOND
+WA_SafeGuard.lua    ("WA_S...")  -> written FIRST
+WeakAuras.lua       ("Weak...")  -> written SECOND
 ```
 
 On a forced disconnect:
+- `WA_SafeGuard.lua` (200-500 KB compressed) is fully written.
+- `WeakAuras.lua` (5-30 MB) is interrupted.
 
-```
-✅ WA_SafeGuard.lua    200–500 KB (compressed backup)  — FULLY WRITTEN
-❌ WeakAuras.lua       5–30 MB   (original data)       — INTERRUPTED
-```
+The backup file is 3-5x smaller than the original due to:
+- Cache stripping (removes auto-regenerated icon caches)
+- Compact serialization (buffer-based writer, no whitespace)
+- Huffman compression (via LibCompress, bundled with WeakAuras)
 
-The backup file is **3–5× smaller** than the original thanks to:
-
-| Optimization | Effect |
-|-------------|--------|
-| Cache stripping | Removes `iconCache`, `tempIconCache`, `registered` (auto-regenerated by WA) |
-| Compact serialization | No whitespace, no indentation, buffer-based writer |
-| Huffman compression | Via LibCompress (bundled with WeakAuras) |
-
-**Small file + written first = survives the crash.**
+Small size + written first = survives the crash.
 
 ---
 
-## 📦 Installation
+## Installation
 
-### Download ZIP
+### Manual Install
 
-1. Click the green **Code** button → **Download ZIP**
-2. Extract the archive
-3. Copy the `WA_SafeGuard` folder into your WoW addons directory:
+1. Download the latest release or clone the repository.
+2. Extract or place the `WA_SafeGuard` folder into your WoW addons directory:
+   ```
+   WoW 3.3.5a/Interface/AddOns/WA_SafeGuard/
+   ```
+3. Verify the structure:
+   ```
+   Interface/AddOns/WA_SafeGuard/
+   ├── WA_SafeGuard.toc
+   ├── WA_SafeGuard.lua
+   └── README.md
+   ```
+4. Restart WoW or type `/reload` in-game.
+5. Ensure the addon is enabled on the character selection screen.
 
-```
-WoW 3.3.5a/Interface/AddOns/WA_SafeGuard/
-```
-
-### Verify
-
-Your folder structure should look like this:
-
-```
-Interface/AddOns/WA_SafeGuard/
-├── WA_SafeGuard.toc
-├── WA_SafeGuard.lua
-├── README.md
-└── LICENSE
-```
-
-4. Restart WoW (or type `/reload` if already in-game)
-5. Make sure the addon is enabled on the character selection screen
-
-> ⚠️ **Important:** Install this addon **while your WeakAuras are working correctly.**
-> The addon creates its first backup on login. If your auras are already
-> lost, you must reimport them first, then `/reload` — the addon will
-> protect them from that point on.
+> **Important:** Install this addon while your WeakAuras are working correctly. The first backup is created on login. If your auras are already lost, reimport them first, then `/reload`.
 
 ---
 
-## 🎮 Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
@@ -162,241 +125,165 @@ Interface/AddOns/WA_SafeGuard/
 | `/wasave` | Force an immediate backup of current auras |
 | `/warestore` | Manually restore auras from the last good backup |
 
-### Automatic behavior (no commands needed)
+### Automatic behavior
 
 | Event | Action |
 |-------|--------|
 | **Login** (auras healthy) | Silently creates/updates backup |
-| **Login** (auras corrupted) | Automatically restores from backup, prompts `/reload` |
+| **Login** (auras corrupted) | Automatically overwrites SavedVariables with backup, prompts `/reload` |
 | **Logout** (clean) | Silently updates backup |
-| **Logout** (auras corrupted) | Does nothing (won't overwrite good backup with bad data) |
-
-**Install and forget.** The addon handles everything automatically.
+| **Logout** (auras corrupted) | Does nothing (preserves existing good backup) |
 
 ---
 
-## ⚙️ How It Works (Technical)
+## How It Works (Technical)
 
 ### Flow diagram
 
 ```
 ┌─────────────────── LOGIN ─────────────────────────────────────────┐
-│                                                                   │
-│  Is WeakAurasSaved a valid table with a displays subtable?        │
-│                                                                   │
-│  ├─ YES (healthy)                                                 │
-│  │   → Strip caches from a copy of WeakAurasSaved                 │
-│  │   → Serialize the copy into a compact Lua string               │
-│  │   → Compress with LibCompress (if available)                   │
-│  │   → Store in WA_SafeGuardDB.data                               │
-│  │   → Print "Backup OK, X auras, Y KB"                           │
-│  │                                                                │
-│  └─ NO (corrupted / missing)                                      │
-│      → Check if WA_SafeGuardDB.data exists and is valid           │
-│      ├─ YES                                                       │
-│      │   → Decode → Decompress → Deserialize                      │
-│      │   → Overwrite WeakAurasSaved with restored data            │
-│      │   → Print "RESTORED X auras! Type /reload"                 │
-│      └─ NO                                                        │
-│          → Print "No backup found, reimport manually"             │
-│                                                                   │
+│ Is WeakAurasSaved a valid table with a displays subtable?         │
+│ ├─ YES (healthy)                                                  │
+│ │   -> Strip caches from copy of WeakAurasSaved                   │
+│ │   -> Serialize into compact Lua string                          │
+│ │   -> Compress with LibCompress (if available)                   │
+│ │   -> Store in WA_SafeGuardDB.data                               │
+│ └─ NO (corrupted / missing)                                       │
+│     -> Check if WA_SafeGuardDB.data exists                        │
+│     ├─ YES -> Decode/Decompress/Deserialize -> Restore -> /reload │
+│     └─ NO  -> Prompt manual reimport                              │
 ├─────────────────── LOGOUT ────────────────────────────────────────┤
-│                                                                   │
-│  Is WeakAurasSaved healthy?                                       │
-│  ├─ YES → Silently update WA_SafeGuardDB                          │
-│  └─ NO  → Do nothing (protect existing good backup)               │
-│                                                                   │
+│ Is WeakAurasSaved healthy?                                        │
+│ ├─ YES -> Silently update WA_SafeGuardDB                          │
+│ └─ NO  -> Do nothing                                              │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
 ### Serialization
 
-The addon uses a custom **buffer-based serializer** that converts the entire `WeakAurasSaved` table into a minimal Lua string. Unlike WoW's default `SavedVariables` writer which adds indentation, newlines, and verbose key formatting, this serializer produces the most compact valid Lua possible.
-
-```lua
--- WoW default SavedVariables format (~15 MB):
-WeakAurasSaved = {
-    ["displays"] = {
-        ["My Aura"] = {
-            ["trigger"] = {
-                ["type"] = "aura",
-                ...
-
--- SafeGuard compact format (~8 MB before compression):
-{["displays"]={["My Aura"]={["trigger"]={["type"]="aura",...
-```
+The addon uses a custom buffer-based serializer. Unlike WoW's default `SavedVariables` writer, it produces compact, valid Lua strings without indentation or verbose key formatting.
 
 ### Compression
 
-If **LibCompress** is available (it ships with WeakAuras), the serialized string is:
-
-1. **Huffman-compressed** — typically 60–80% size reduction
-2. **Encoded** via LibCompress's addon-safe encoding table
-
-If LibCompress is not available, the addon stores the uncompressed string. Still works — just takes more disk space.
+If **LibCompress** is available, the serialized string is Huffman-compressed and encoded. If unavailable, the raw string is stored.
 
 ### Corruption detection
 
-WeakAuras data is considered **corrupted** if any of these are true:
-- `WeakAurasSaved` is `nil`
-- `WeakAurasSaved` is not a `table`
-- `WeakAurasSaved.displays` is not a `table`
+Data is considered corrupted if:
+- `WeakAurasSaved` is `nil` or not a table
+- `WeakAurasSaved.displays` is not a table
+- `WeakAurasSaved.displays` is empty while a valid backup exists
 
 ### Safety measures
 
-| Measure | Purpose |
-|---------|---------|
-| `setfenv(fn, {})` | Sandboxed deserialization — no arbitrary code execution |
-| Size validation (`> 50 bytes`) | Won't treat empty/tiny backup as valid |
-| Never overwrite good backup with bad data | If WA is corrupted on logout, backup is preserved |
-| `pcall` everywhere | Serialization/compression errors won't crash the addon |
-| 2-second login delay | Backup logic runs after all addons finish loading |
+- Sandboxed deserialization via `setfenv(fn, {})`
+- Size validation (>50 bytes) prevents treating empty backups as valid
+- Never overwrites a good backup with corrupted data
+- `pcall` wraps all serialization/compression operations
+- 3-second login delay ensures all addons finish loading before backup runs
 
 ---
 
-## 📸 Example Output
+## Example Output
 
-### ✅ Healthy login (backup created)
-
+### Healthy login (backup created)
 ```
 [SafeGuard] Loaded. Commands: /wastatus /wasave /warestore
-[SafeGuard] Backup OK  142 auras  1847KB → 538KB (71% smaller)
+[SafeGuard] Backup OK  142 auras  ~1847KB
 ```
 
-### 🔴 Corrupted login (auto-restore)
-
+### Corrupted login (auto-restore)
 ```
 [SafeGuard] Loaded. Commands: /wastatus /wasave /warestore
-[SafeGuard] ══ WeakAuras is CORRUPTED! ══
+[SafeGuard] == WeakAuras data is CORRUPTED! ==
 [SafeGuard] RESTORED 142 auras!
-[SafeGuard] Type /reload now!
+[SafeGuard] Auras restored to SavedVariables. Type /reload to apply.
 ```
 
-### 📊 Status check
-
+### Status check
 ```
 /wastatus
 
 [SafeGuard] === Status ===
 [SafeGuard] WeakAuras: OK (142 auras)
-[SafeGuard] Backup: OK  142 auras  538KB  12 min ago  compressed=yes
-```
-
-### 💾 Manual backup
-
-```
-/wasave
-
-[SafeGuard] Backup OK  142 auras  1847KB → 538KB (71% smaller)
-```
-
-### 🔄 Manual restore
-
-```
-/warestore
-
-[SafeGuard] RESTORED 142 auras!
-[SafeGuard] Type /reload now!
+[SafeGuard] Backup: OK  142 auras  ~538KB  12 min ago
 ```
 
 ---
 
-## ❓ FAQ
+## FAQ
 
-### Will this increase my memory usage?
+### Will this increase memory usage?
+The compressed backup is typically 3-5x smaller than the original data. This is a negligible tradeoff for data integrity.
 
-The compressed backup is typically **3–5× smaller** than the original data. If your `WeakAuras.lua` is 15 MB, the backup will be roughly 3–5 MB in memory and on disk. This is a worthwhile tradeoff for never losing your auras.
-
-### What if both `WA_SafeGuard.lua` and `WeakAuras.lua` get corrupted?
-
-Extremely unlikely. `WA_SafeGuard.lua` is written **first** (alphabetically) and is **much smaller**. But if it somehow happens, check for `WA_SafeGuard.lua.bak` in your `SavedVariables` folder and rename it.
+### What if both files get corrupted?
+Extremely unlikely due to alphabetical write order and smaller size. If it occurs, check `WA_SafeGuard.lua.bak` in your SavedVariables folder.
 
 ### Does this work on other WoW versions?
-
-Built and tested for **3.3.5a (WotLK)** on Warmane. May work on other versions (TBC 2.4.3, Cata 4.3.4) but is untested. The `## Interface: 30300` in the `.toc` file would need to be changed for other versions.
+Built and tested for 3.3.5a (WotLK). May work on 2.4.3 or 4.3.4 if `## Interface` is updated, but is untested.
 
 ### Can I use this without WeakAuras?
+No. The addon only activates when WeakAuras data is present.
 
-No. This addon exists solely to protect WeakAuras data. Without WeakAuras installed, it will load but do nothing.
+### How do I prevent the issue entirely?
+Before logging into a second client, type `/reload` on the first. This forces a clean save of all SavedVariables.
 
-### How do I prevent the problem entirely?
-
-**Before logging in on a second client**, type `/reload` on the first client. This forces WoW to cleanly save all `SavedVariables` to disk. After that, even a forced disconnect won't lose data because the files are already written.
-
-### My auras are already gone. Can this addon recover them?
-
-**No.** This addon prevents **future** loss. If your auras are already gone:
-
-1. Reimport your auras from wago.io or wherever you got them
-2. Type `/reload` in-game
-3. WA_SafeGuard will create a backup automatically
-4. You are now protected going forward
-
-### Does this conflict with other addons?
-
-No. WA_SafeGuard has no dependencies (LibCompress is optional and loaded from WeakAuras), hooks no functions, modifies no frames, and only touches `WeakAurasSaved` when restoring from backup.
+### My auras are already gone. Can this recover them?
+No. This addon prevents future loss. Reimport your auras, then `/reload`. The addon will protect them moving forward.
 
 ### How often is the backup updated?
-
-On every **login** and every **logout** — as long as WeakAuras data is healthy. If you add new auras mid-session, type `/wasave` then `/reload` to ensure the backup is current.
+On every login and logout, provided WeakAuras data is healthy. Use `/wasave` after adding new auras mid-session.
 
 ---
 
-## 📁 File Structure
+## File Structure
 
 ### Addon files
-
 ```
 WA_SafeGuard/
-├── WA_SafeGuard.toc       # Addon metadata (Interface version, dependencies)
-├── WA_SafeGuard.lua        # All addon logic — single file, zero dependencies
-├── README.md               # Documentation
-└── LICENSE                  # MIT License
+├── WA_SafeGuard.toc
+├── WA_SafeGuard.lua
+└── README.md
 ```
 
 ### SavedVariables location
-
 ```
 WTF/Account/<ACCOUNT_NAME>/SavedVariables/
-├── WA_SafeGuard.lua        # Backup data (compressed)
-├── WA_SafeGuard.lua.bak    # WoW's own backup of the backup
-├── WeakAuras.lua            # Original WeakAuras data
-└── WeakAuras.lua.bak        # WoW's backup (unreliable after force DC)
+├── WA_SafeGuard.lua
+├── WA_SafeGuard.lua.bak
+├── WeakAuras.lua
+└── WeakAuras.lua.bak
 ```
 
 ---
 
-## 🔧 Compatibility
+## Compatibility
 
-| | |
-|---|---|
+| Feature | Value |
+|---------|-------|
 | **WoW Version** | 3.3.5a (WotLK) |
 | **Interface** | 30300 |
 | **Tested On** | Warmane (Lordaeron, Icecrown, Frostmourne) |
-| **WeakAuras** | Required (any 3.3.5a-compatible version) |
-| **LibCompress** | Optional — bundled with WeakAuras, used for compression |
-| **Other addons** | No conflicts known |
+| **WeakAuras** | Required |
+| **LibCompress** | Optional (bundled with WeakAuras) |
+| **Conflicts** | None known |
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Found a bug? Have an improvement idea?
-
-1. [Open an issue](../../issues)
-2. Fork the repo
-3. Create a branch (`git checkout -b fix/my-fix`)
-4. Commit your changes (`git commit -m "fix: description"`)
-5. Push (`git push origin fix/my-fix`)
-6. Open a Pull Request
+1. Open an issue describing the bug or feature.
+2. Fork the repository and create a branch.
+3. Commit changes following standard Lua/WoW conventions.
+4. Submit a Pull Request with a clear description.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- [WeakAuras for WotLK](https://github.com/NoM0Re/WeakAuras-WotLK) — the best aura framework
-- The Warmane community — for collectively losing enough auras to inspire this addon
+- [WeakAuras for WotLK](https://github.com/NoM0Re/WeakAuras-WotLK)
+- The Warmane community for stress-testing this edge case.
 
 ---
 
-*Made with frustration and determination after losing WeakAuras one too many times.* 
+Developed to solve a persistent WeakAuras data loss issue on private servers. MIT License.

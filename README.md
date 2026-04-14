@@ -131,8 +131,8 @@ Small size + written first = survives the crash.
 |-------|--------|
 | **Login** (auras healthy) | Silently creates/updates backup |
 | **Login** (auras corrupted) | Automatically overwrites SavedVariables with backup, prompts `/reload` |
-| **Logout** (clean) | Silently updates backup |
-| **Logout** (auras corrupted) | Does nothing (preserves existing good backup) |
+| **Zone change / Logout** (clean) | Silently updates backup (via PLAYER_LEAVING_WORLD) |
+| **Zone change / Logout** (auras corrupted) | Does nothing (preserves existing good backup) |
 
 ---
 

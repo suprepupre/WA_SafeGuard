@@ -3,7 +3,7 @@ WA_SafeGuardDB = WA_SafeGuardDB or {}
 local P = "|cff00ccff[SafeGuard]|r "
 
 ----------------------------------------------------------------
--- Serializer: per-chunk processing to avoid large memory allocations
+-- Serializer: per-cxhunk processing to avoid large memory allocations
 ----------------------------------------------------------------
 local B, N
 
@@ -75,10 +75,15 @@ end
 ----------------------------------------------------------------
 -- Helpers
 ----------------------------------------------------------------
+local function HasBackup()
+    return type(WA_SafeGuardDB) == "table"
+        and type(WA_SafeGuardDB.displays) == "table"
+        and next(WA_SafeGuardDB.displays) ~= nil
+end
+
 local function IsBroken()
     if type(WeakAurasSaved) ~= "table" then return true end
     if type(WeakAurasSaved.displays) ~= "table" then return true end
-    -- Если displays пустая, но бэкап существует -> файл скорее всего повреждён/обнулён
     if not next(WeakAurasSaved.displays) and HasBackup() then return true end
     return false
 end
@@ -89,12 +94,6 @@ local function NumAuras(t)
     local c = 0
     for _ in pairs(t.displays) do c = c + 1 end
     return c
-end
-
-local function HasBackup()
-    return type(WA_SafeGuardDB) == "table"
-        and type(WA_SafeGuardDB.displays) == "table"
-        and next(WA_SafeGuardDB.displays) ~= nil
 end
 
 ----------------------------------------------------------------
@@ -258,13 +257,14 @@ initDelay:SetScript("OnUpdate", function(self, dt)
 end)
 
 frame:RegisterEvent("PLAYER_LOGIN")
-frame:RegisterEvent("PLAYER_LOGOUT")
+frame:RegisterEvent("PLAYER_LEAVING_WORLD")
 
 frame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_LOGIN" and not booted then
         booted = true
         initDelay:Show()
-    elseif event == "PLAYER_LOGOUT" then
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        -- Backup BEFORE logout saves WeakAuras data
         if not IsBroken() then
             pcall(DoBackup, true)
         end

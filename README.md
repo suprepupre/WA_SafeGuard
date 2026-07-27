@@ -274,5 +274,4 @@ Developed to solve a persistent WeakAuras data loss issue on private servers. MI
 | [wow_optimize](https://github.com/suprepupre/wow-optimize) | Engine-level optimization DLL - allocator, Lua VM, timers, file I/O, frame-time benchmark |
 | [LuaBoost](https://github.com/suprepupre/LuaBoost) | Addon-side GC control, loading-screen helpers, shared APIs for addon authors |
 | [DefileAlert](https://github.com/suprepupre/DefileAlert) | Instant Defile target callout for the Lich King encounter |
-| [DSPlates](https://github.com/suprepupre/DSPlates) | Divine Storm icon on enemy nameplates, with range checking (Paladin) |
 

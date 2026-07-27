@@ -179,6 +179,12 @@ local function DoRestore()
 
     local count = 0
     local errors = 0
+    local failedAuras = {}
+    local totalInBackup = 0
+
+    -- Count total auras in backup first
+    for _ in pairs(db.displays) do totalInBackup = totalInBackup + 1 end
+
     for name, s in pairs(db.displays) do
         local aura = Deserialize(s)
         if aura then
@@ -186,6 +192,7 @@ local function DoRestore()
             count = count + 1
         else
             errors = errors + 1
+            failedAuras[errors] = name
         end
     end
 
@@ -196,11 +203,18 @@ local function DoRestore()
 
     WeakAurasSaved = restored
 
-    local msg = format("|cff00ff00RESTORED %d auras!|r", count)
+    print(P .. format("Backup contains: |cff00ccff%d|r auras", totalInBackup))
+    print(P .. format("|cff00ff00RESTORED %d auras!|r", count))
     if errors > 0 then
-        msg = msg .. format("  |cffffff00(%d failed)|r", errors)
+        print(P .. format("|cffff0000FAILED: %d auras could not be deserialized|r", errors))
+        local showCount = math.min(errors, 5)
+        for i = 1, showCount do
+            print(P .. format("  - %s", failedAuras[i]))
+        end
+        if errors > 5 then
+            print(P .. format("  ... and %d more", errors - 5))
+        end
     end
-    print(P .. msg)
     return true
 end
 
@@ -214,7 +228,7 @@ local function ShowStatus()
     else
         print(P .. format("WeakAuras: |cff00ff00OK|r (%d auras)", NumAuras()))
     end
-    
+
     if HasBackup() then
         local totalKB = 0
         for _, s in pairs(WA_SafeGuardDB.displays) do totalKB = totalKB + #s end
@@ -223,8 +237,31 @@ local function ShowStatus()
         print(P .. format("Backup: |cff00ff00OK|r  %d auras  ~%dKB  %d min ago",
             WA_SafeGuardDB.n or 0, totalKB, ago))
     else
-        print(P .. "Backup: |cffff0000NONE|r")
+        print(P .. "Backup: |cffff0000NONE|r (in-memory)")
+        print(P .. "|cffffff00Tip:|r Type |cff00ff00/wabak|r for .bak file recovery instructions.")
     end
+end
+
+----------------------------------------------------------------
+-- .bak File Recovery Guide
+----------------------------------------------------------------
+local function ShowBakRecoveryGuide()
+    print(P .. "=== .bak File Recovery ===")
+    print(P .. "When WoW force-disconnects, WA_SafeGuard.lua can be truncated.")
+    print(P .. "Your backup may still exist as |cff00ff00WA_SafeGuard.lua.bak|r on disk.")
+    print(P .. " ")
+    print(P .. "|cffffff00Steps:|r")
+    print(P .. "  1. |cffff0000Exit WoW completely|r (close ALL clients)")
+    print(P .. "  2. Go to: |cffaaaaaaWTF\\Account\\<ACCOUNT>\\SavedVariables\\|r")
+    print(P .. "  3. Check file sizes:")
+    print(P .. "     - |cffff0000WA_SafeGuard.lua|r (truncated = ~1KB = bad)")
+    print(P .. "     - |cff00ff00WA_SafeGuard.lua.bak|r (large = good backup)")
+    print(P .. "  4. Delete the truncated |cffff0000WA_SafeGuard.lua|r")
+    print(P .. "  5. Rename |cff00ff00WA_SafeGuard.lua.bak|r to |cff00ff00WA_SafeGuard.lua|r")
+    print(P .. "  6. Start WoW, log in, type |cff00ff00/warestore|r")
+    print(P .. "  7. Type |cff00ff00/reload|r to apply restored auras")
+    print(P .. " ")
+    print(P .. "|cffaaaaaaIf no .bak exists, you must reimport your auras manually.|r")
 end
 
 ----------------------------------------------------------------
@@ -248,8 +285,9 @@ initDelay:SetScript("OnUpdate", function(self, dt)
             DoRestore()
             print(P .. "|cffffff00Auras restored to SavedVariables. Type /reload to apply.|r")
         else
-            print(P .. "|cffff0000No valid backup found.|r")
-            print(P .. "Reimport your auras, then type /reload.")
+            print(P .. "|cffff0000No valid backup found in memory.|r")
+            print(P .. "Your backup may exist as |cff00ff00WA_SafeGuard.lua.bak|r on disk.")
+            print(P .. "Type |cff00ff00/wabak|r for recovery instructions.")
         end
     else
         DoBackup(true) -- Silent backup on healthy login
@@ -284,4 +322,7 @@ SlashCmdList.WASGR = function() DoRestore() end
 SLASH_WASGS1 = "/wastatus"
 SlashCmdList.WASGS = function() ShowStatus() end
 
-print(P .. "Loaded. Commands: /wastatus /wasave /warestore")
+SLASH_WASGB1 = "/wabak"
+SlashCmdList.WASGB = function() ShowBakRecoveryGuide() end
+
+print(P .. "Loaded. Commands: /wastatus /wasave /warestore /wabak")

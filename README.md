@@ -256,29 +256,6 @@ WTF/Account/<ACCOUNT_NAME>/SavedVariables/
 ```
 
 ---
-
-## Compatibility
-
-| Feature | Value |
-|---------|-------|
-| **WoW Version** | 3.3.5a (WotLK) |
-| **Interface** | 30300 |
-| **Tested On** | Warmane (Lordaeron, Icecrown, Frostmourne) |
-| **WeakAuras** | Required |
-| **LibCompress** | Optional (bundled with WeakAuras) |
-| **Conflicts** | None known |
-
----
-
-## Contributing
-
-1. Open an issue describing the bug or feature.
-2. Fork the repository and create a branch.
-3. Commit changes following standard Lua/WoW conventions.
-4. Submit a Pull Request with a clear description.
-
----
-
 ## Acknowledgments
 
 - [WeakAuras for WotLK](https://github.com/NoM0Re/WeakAuras-WotLK)
@@ -287,3 +264,15 @@ WTF/Account/<ACCOUNT_NAME>/SavedVariables/
 ---
 
 Developed to solve a persistent WeakAuras data loss issue on private servers. MIT License.
+
+---
+
+## Also for WoW 3.3.5a
+
+| Project | What it does |
+|---|---|
+| [wow_optimize](https://github.com/suprepupre/wow-optimize) | Engine-level optimization DLL - allocator, Lua VM, timers, file I/O, frame-time benchmark |
+| [LuaBoost](https://github.com/suprepupre/LuaBoost) | Addon-side GC control, loading-screen helpers, shared APIs for addon authors |
+| [DefileAlert](https://github.com/suprepupre/DefileAlert) | Instant Defile target callout for the Lich King encounter |
+| [DSPlates](https://github.com/suprepupre/DSPlates) | Divine Storm icon on enemy nameplates, with range checking (Paladin) |
+
